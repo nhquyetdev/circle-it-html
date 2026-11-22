@@ -25,15 +25,37 @@ function inPoly(x, y, p) { let c = false; for (let i = 0, j = p.length - 1; i < 
 /* ---------- canvas ---------- */
 const cv = $('game'), ctx = cv.getContext('2d');
 let W = 800, H = 800, S = 1, DPR = 1, K = 1;
+let SAFE = { l: 0, r: 0, t: 0, b: 0 }, ARENA = null, SK = null;
+function readSafe() {
+  const p = $('safeProbe'); if (!p) return; const cs = getComputedStyle(p);
+  SAFE = { l: parseFloat(cs.paddingLeft) || 0, r: parseFloat(cs.paddingRight) || 0, t: parseFloat(cs.paddingTop) || 0, b: parseFloat(cs.paddingBottom) || 0 };
+}
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
-  const cw = innerWidth, ch = innerHeight;
+  const cw = window.innerWidth, ch = window.innerHeight;
   cv.width = Math.round(cw * DPR); cv.height = Math.round(ch * DPR);
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
   const sm = Math.min(cw, ch); S = sm / (sm < 600 ? 600 : 800); W = cw / S; H = ch / S;
-  K = Math.max(1, .85 / S); // HUD scale so text stays readable on phones
+  K = Math.max(1, (ch < 520 ? .72 : .85) / S); // HUD scale so text stays readable on phones
+  readSafe(); layout();
 }
-addEventListener('resize', resize); resize();
-const arena = () => ({ x0: 30, y0: 70 * K + 30, x1: W - 30, y1: H - 140 / S - 10 });
+// fight area = screen minus HUD (top bar, HP/MP bars, skill buttons, notch)
+function layout() {
+  const r = $('skills').getBoundingClientRect();
+  SK = r.width ? { x: r.left / S, y: r.top / S, w: r.width / S, h: r.height / S, vertical: r.height > r.width } : null;
+  const top = SAFE.t / S + 58 * K + 12, bars = SAFE.b / S + 12 + 44 * K + 10;
+  let x1 = W - 30 - SAFE.r / S, y1 = H - bars;
+  if (SK && SK.vertical) x1 = Math.min(x1, SK.x - 14);
+  else if (SK) y1 = Math.min(y1, SK.y - 10);
+  ARENA = { x0: 30 + SAFE.l / S, y0: top, x1, y1 };
+  // never collapse: keep at least room for a big boss
+  if (ARENA.y1 - ARENA.y0 < 260) { const c = (ARENA.y0 + ARENA.y1) / 2; ARENA.y0 = Math.max(10, c - 130); ARENA.y1 = Math.min(H - 10, c + 130); }
+  if (ARENA.x1 - ARENA.x0 < 260) { const c = (ARENA.x0 + ARENA.x1) / 2; ARENA.x0 = Math.max(10, c - 130); ARENA.x1 = Math.min(W - 10, c + 130); }
+}
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 200));
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+const arena = () => ARENA;
 
 /* ---------- audio ---------- */
 let AC = null, muted = localStorage.getItem('circleit_mute') === '1';
@@ -124,6 +146,7 @@ function makeBoss(def, m, i, n) {
 }
 
 function startStage() {
+  $('hud').classList.remove('hidden'); layout();
   const d = derived(run.stats);
   const list = stageBosses(run.stage);
   F = {
@@ -136,7 +159,7 @@ function startStage() {
     stageDmg: 0
   };
   ptr.down = false; paused = false;
-  state = 'play'; show(null); $('hud').classList.remove('hidden');
+  state = 'play'; show(null); $('hud').classList.remove('hidden'); layout();
   beep(330, .15, 'sawtooth', .05, 300);
 }
 
@@ -178,6 +201,7 @@ SKILLS.forEach((s, i) => {
   b.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); useSkill(i); });
   $('skills').appendChild(b); skillEls.push(b);
 });
+resize();
 function useSkill(i) {
   if (!F || paused || F.ending) return;
   const s = SKILLS[i];
@@ -524,22 +548,24 @@ function drawHUD() {
   ctx.textBaseline = 'middle';
   const font = (px, w = 'bold') => `${w} ${px * K}px "Trebuchet MS",sans-serif`;
   const tot = F.bosses.reduce((s, b) => s + b.maxHp, 0), cur = F.bosses.reduce((s, b) => s + b.hp, 0);
-  const side = Math.max(90 * K, 60 / S);
+  const SL = SAFE.l / S, ST = SAFE.t / S;
+  const side = Math.max(90 * K + SL, (62 + SAFE.r) / S);
   const bw = Math.min(620, W - side * 2), bx = (W - bw) / 2;
   const names = F.bosses.length > 1 ? `Stage ${run.stage} — ${F.bosses.length} bosses` : F.bosses[0].def.name;
-  ctx.font = font(19); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(names, W / 2, 18 * K, bw);
-  bar(bx, 32 * K, bw, 18 * K, cur / tot, F.bosses.some(b => b.enraged && !b.dead) ? '#ff3b5c' : '#ff4d8d', `${Math.ceil(cur)} / ${Math.ceil(tot)}`);
+  ctx.font = font(19); ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText(names, W / 2, ST + 16 * K, bw);
+  bar(bx, ST + 29 * K, bw, 18 * K, cur / tot, F.bosses.some(b => b.enraged && !b.dead) ? '#ff3b5c' : '#ff4d8d', `${Math.ceil(cur)} / ${Math.ceil(tot)}`);
   ctx.textAlign = 'left'; ctx.font = font(15); ctx.fillStyle = '#ff4d8d';
-  ctx.fillText(testMode ? 'TEST' : 'STAGE ' + run.stage, 10, 16 * K);
+  ctx.fillText(testMode ? 'TEST' : 'STAGE ' + run.stage, 10 + SL, ST + 14 * K);
   const tm = Math.ceil(F.time), ts = `${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}`;
   ctx.font = font(24); ctx.fillStyle = F.time < 30 ? (Math.sin(F.now * 8) > 0 ? '#ff3b5c' : '#fff') : '#fff';
-  ctx.fillText(ts, 10, 42 * K);
+  ctx.fillText(ts, 10 + SL, ST + 38 * K);
   // player bars (left of the skill buttons)
-  const w2 = Math.max(120, Math.min(320 * K, W - (3 * 72 + 30) / S - 24));
-  const py = H - 12 - 44 * K;
-  bar(12, py, w2, 22 * K, F.hp / F.d.maxHp, F.hp / F.d.maxHp < .3 ? '#ff3b5c' : '#4cd964', `HP ${Math.ceil(F.hp)} / ${F.d.maxHp}`);
-  bar(12, py + 28 * K, w2, 15 * K, F.mp / F.d.maxMp, '#3a8bff', `MP ${Math.floor(F.mp)} / ${F.d.maxMp}`);
-  if (F.power) { ctx.fillStyle = '#ff4d8d'; ctx.font = font(14); ctx.textAlign = 'left'; ctx.fillText('✦ POWER READY', 12, py - 14 * K); }
+  const room = SK && !SK.vertical ? SK.x - 24 - SL : W * .45;
+  const w2 = Math.max(110, Math.min(320 * K, room));
+  const py = H - 12 - SAFE.b / S - 44 * K;
+  bar(12 + SL, py, w2, 22 * K, F.hp / F.d.maxHp, F.hp / F.d.maxHp < .3 ? '#ff3b5c' : '#4cd964', `HP ${Math.ceil(F.hp)} / ${F.d.maxHp}`);
+  bar(12 + SL, py + 28 * K, w2, 15 * K, F.mp / F.d.maxMp, '#3a8bff', `MP ${Math.floor(F.mp)} / ${F.d.maxMp}`);
+  if (F.power) { ctx.fillStyle = '#ff4d8d'; ctx.font = font(14); ctx.textAlign = 'left'; ctx.fillText('✦ POWER READY', 12 + SL, py - 14 * K); }
   if (F.tut && !F.ending) {
     const msgs = [
       'Hold & drag to draw. Draw a circle AROUND the dummy!',
@@ -550,7 +576,7 @@ function drawHUD() {
     ctx.font = font(16); ctx.textAlign = 'center';
     const lines = wrapLines(msgs[F.tut.step], Math.min(W - 30, 640) - 24);
     const tw = Math.min(W - 30, Math.max(...lines.map(l => ctx.measureText(l).width)) + 28), lh = 20 * K, th = lines.length * lh + 14 * K;
-    const ty = 58 * K;
+    const ty = ST + 54 * K;
     ctx.fillStyle = 'rgba(29,37,80,.92)'; roundRect(W / 2 - tw / 2, ty, tw, th, 12); ctx.fill();
     ctx.fillStyle = '#ffe48a'; lines.forEach((l, i) => ctx.fillText(l, W / 2, ty + 7 * K + lh * (i + .5)));
   }
@@ -624,7 +650,7 @@ function renderAlloc() {
   const L = $('statList'); L.innerHTML = '';
   Object.keys(STATS).forEach(k => {
     const row = document.createElement('div'); row.className = 'stat';
-    row.innerHTML = `<span class="k">${k}</span><span class="d">${STATS[k].d(run.stats[k])}</span><button class="m">−</button><span class="v">${run.stats[k]}</span><button class="p">+</button>`;
+    row.innerHTML = `<span class="info"><span class="k">${k}</span><span class="d">${STATS[k].d(run.stats[k])}</span></span><button class="m">−</button><span class="v">${run.stats[k]}</span><button class="p">+</button>`;
     const m = row.querySelector('.m'), p = row.querySelector('.p');
     m.disabled = !(run.spent[k] > 0); p.disabled = run.points <= 0;
     m.onclick = () => { if (run.spent[k] > 0) { run.spent[k]--; run.stats[k]--; run.points++; renderAlloc(); } };
