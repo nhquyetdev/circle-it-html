@@ -35,8 +35,9 @@ ul.help{text-align:left;padding-left:20px;font-size:14px;line-height:1.55;color:
 #introArt{width:160px;height:160px;margin:0 auto}
 
 #statList{display:flex;flex-direction:column;gap:6px}
-.stat{display:grid;grid-template-columns:60px 1fr 34px 40px 34px;align-items:center;gap:6px;background:#141a3a;
+.stat{display:grid;grid-template-columns:1fr 34px 36px 34px;align-items:center;gap:6px;background:#141a3a;
   border-radius:10px;padding:6px 8px;text-align:left}
+.stat .info{display:flex;flex-direction:column;min-width:0}
 .stat .k{font-weight:900;color:#5ef1ff}
 .stat .d{font-size:12px;color:#aab4e8;line-height:1.25}
 .stat .d b{color:#fff}
@@ -51,9 +52,9 @@ table.lb tr.me td{color:#ffd43b}
 table.lb td:nth-child(2){text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 #hud{position:fixed;inset:0;pointer-events:none;z-index:5}
-.icon-btn{pointer-events:auto;position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:10px;border:none;
+.icon-btn{pointer-events:auto;position:absolute;top:calc(8px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));width:40px;height:40px;border-radius:10px;border:none;
   background:rgba(42,54,120,.7);color:#fff;font-size:15px;cursor:pointer}
-#skills{position:absolute;right:10px;bottom:12px;display:flex;gap:8px;pointer-events:auto}
+#skills{position:absolute;right:calc(10px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px;pointer-events:auto}
 .skill{position:relative;width:64px;height:64px;border-radius:14px;border:2px solid #3a4aa0;background:rgba(20,26,58,.85);
   color:#fff;cursor:pointer;overflow:hidden;font-family:inherit;touch-action:manipulation}
 .skill .ic{font-size:24px;line-height:1}
@@ -64,4 +65,52 @@ table.lb td:nth-child(2){text-align:left;max-width:180px;overflow:hidden;text-ov
 .skill .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold}
 .skill.active{border-color:#ffd43b;box-shadow:0 0 12px #ffd43b}
 .skill.nomp{opacity:.55}
-@media (max-width:500px){h1.logo{font-size:40px}.skill{width:56px;height:56px}.stat{grid-template-columns:48px 1fr 30px 32px 30px}}
+
+
+#safeProbe{position:fixed;visibility:hidden;pointer-events:none;width:0;height:0;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.screen{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+
+/* phones */
+@media (max-width:500px){
+  h1.logo{font-size:40px}
+  .panel{padding:16px 14px}
+  .skill{width:56px;height:56px}
+}
+/* short screens (landscape phones, small windows) */
+@media (max-height:560px){
+  .panel{padding:12px 14px;gap:7px;border-radius:14px}
+  h1.logo{font-size:34px}
+  h2{font-size:20px}
+  .sub{font-size:13px}
+  .btn{padding:7px 12px;font-size:14px}
+  .btn.big{font-size:17px;padding:9px 20px}
+  .field input{padding:7px}
+  #introArt{width:80px;height:80px}
+  .hint{padding:6px 8px;font-size:13px}
+  .big-num{font-size:22px}
+  .stat{padding:4px 8px}
+  .stat button{width:30px;height:30px}
+  table.lb td{padding:4px}
+}
+/* landscape phones: two-column menus, skill buttons on the right side */
+@media (orientation:landscape) and (max-height:520px){
+  .panel.wide{max-width:760px}
+  #statList{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #s-title .panel{max-width:640px;display:grid;grid-template-columns:1fr 1fr;align-items:center;text-align:center}
+  #s-title .logo,#s-title .sub{grid-column:1/-1}
+  #s-intro .panel{max-width:620px;display:grid;grid-template-columns:110px 1fr;column-gap:14px;text-align:left}
+  #s-intro #introArt{grid-row:1/7;align-self:center;width:100px;height:100px}
+  #s-intro .stage-label,#s-intro h2,#s-intro .sub,#s-intro .small,#s-intro .hint,#s-intro .btn{grid-column:2}
+  #skills{flex-direction:column;bottom:auto;top:50%;transform:translateY(-50%)}
+  .skill{width:52px;height:52px}
+  .skill .ic{font-size:20px}
+  .icon-btn{width:34px;height:34px}
+}
+/* big screens: scale buttons with the screen */
+@media (min-height:700px) and (min-width:900px){
+  .skill{width:clamp(64px,7.5vmin,96px);height:clamp(64px,7.5vmin,96px)}
+  .skill .ic{font-size:clamp(24px,3vmin,36px)}
+  .skill .nm{font-size:clamp(9px,1.1vmin,13px)}
+  .icon-btn{width:clamp(40px,4.5vmin,56px);height:clamp(40px,4.5vmin,56px);font-size:clamp(15px,1.8vmin,20px)}
+}
